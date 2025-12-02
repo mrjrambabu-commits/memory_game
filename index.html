@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Memory Card Game</title>
+  <style>
+    :root{
+      --bg:#0f172a;
+      --card-back:#1e293b;
+      --accent:#06b6d4;
+      --card-size:calc(80vmin / 6);
+      --gap:12px;
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      background:linear-gradient(180deg,#071128 0%, var(--bg) 100%);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+      color:#e6eef4;
+      -webkit-font-smoothing:antialiased;
+    }
+
+    .wrap{
+      width:100%;
+      max-width:920px;
+      margin:0 auto;
+    }
+
+    header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:14px;
+    }
+    h1{
+      margin:0;
+      font-size:20px;
+      letter-spacing:0.3px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .controls{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+    .btn{
+      background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.06));
+      border:1px solid rgba(255,255,255,0.06);
+      padding:8px 12px;
+      border-radius:10px;
+      cursor:pointer;
+      color:inherit;
+      font-weight:600;
+      font-size:14px;
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+    }
+    .btn:active{transform:translateY(1px)}
+    .small{
+      font-size:13px;
+      opacity:0.9;
+      padding:6px 10px;
+      border-radius:8px;
+    }
+
+    .stats{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      font-size:14px;
+      color: #cfeaf2;
+    }
+
+    .board{
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+      gap:var(--gap);
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      padding:14px;
+      border-radius:14px;
+      box-shadow: 0 6px 22px rgba(2,6,23,0.6);
+    }
+
+    /* Card */
+    .card{
+      width:100%;
+      aspect-ratio: 1 / 1;
+      perspective: 1000px;
+      cursor:pointer;
+    }
+    .card-inner{
+      width:100%;
+      height:100%;
+      position:relative;
+      transform-style:preserve-3d;
+      transition: transform 350ms cubic-bezier(.2,.9,.3,1);
+      border-radius:10px;
+      box-shadow: 0 4px 14px rgba(2,6,23,0.6), inset 0 -1px 0 rgba(255,255,255,0.02);
+    }
+    .card.flipped .card-inner { transform: rotateY(180deg); }
+    .card-face{
+      position:absolute;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      backface-visibility:hidden;
+      border-radius:10px;
+      user-select:none;
+      -webkit-user-select:none;
+      font-size: clamp(22px, 5vmin, 36px);
+      font-weight:700;
+    }
+    .face-front{
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.06));
+      transform: rotateY(180deg);
+    }
+    .face-back{
+      background: linear-gradient(180deg, var(--card-back), rgba(0,0,0,0.16));
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      color:#99a8b4;
+      font-weight:700;
+      font-size:14px;
+    }
+    .face-back .icon{
+      font-size:18px;
+    }
+
+    .matched{
+      outline: 3px solid rgba(6,182,212,0.12);
+      box-shadow: 0 6px 14px rgba(6,182,212,0.06);
+      transform: scale(1.02);
+      transition: transform 220ms;
+    }
+
+    footer{
+      margin-top:12px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      color:#9fb9c3;
+      font-size:13px;
+    }
+
+    /* Responsive grid size tweaks */
+    @media (min-width:700px){
+      .board{
+        grid-template-columns: repeat(6, 1fr);
+      }
+    }
+    @media (max-width:420px){
+      :root{ --gap:8px; }
+      .btn{ padding:7px 10px; font-size:13px;}
+      h1{ font-size:16px }
+    }
+
+    /* subtle hover for non-flipped cards */
+    .card:not(.flipped):hover .card-inner { transform: translateY(-6px) rotateY(0deg); }
+    .sr-only{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
+  </style>
+</head>
+<body>
+  <div class="wrap" role="application" aria-label="Memory card game">
+    <header>
+      <h1>🧠 Memory Game</h1>
+      <div class="controls">
+        <div class="stats" aria-live="polite">
+          <div id="moves">Moves: 0</div>
+          <div id="timer">Time: 00:00</div>
+          <div id="pairs">Matched: 0/0</div>
+        </div>
+        <button id="restart" class="btn small" title="Restart game">🔁 New Game</button>
+        <button id="hint" class="btn small" title="Reveal unmatched cards briefly">💡 Hint</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="board" class="board" aria-label="Game board"></section>
+    </main>
+
+    <footer>
+      <div>Best: <span id="best">—</span></div>
+      <div style="opacity:.9">Click cards to match pairs • Built with JavaScript</div>
+    </footer>
+  </div>
+
+  <script>
+  /***********************
+   * Memory Game (Vanilla JS)
+   * - Emoji pairs (no assets)
+   * - Shuffle, flip, match, timer, moves
+   * - Saves best score to localStorage
+   ***********************/
+
+  (function(){
+    // Configuration
+    const PAIR_COUNT = 12; // total unique pairs (changeable). Total cards = PAIR_COUNT * 2
+    const FLIP_DELAY = 700; // ms to show unmatched pair
+    const HINT_DURATION = 1200; // ms to reveal unmatched temporarily
+
+    // Emoji pool (add/remove to customize)
+    const EMOJIS = [
+      "🍉","🍓","🍋","🍇","🍍","🥝","🍑","🍒","🍊","🥭","🍏","🍌",
+      "⚽","🏀","🏈","🎲","🎸","🎯","🎮","🧩","🚗","✈️","🛶","🚲",
+      "🐶","🐱","🐻","🐼","🦊","🐵","🐸","🐧","🐢","🦄","🦁","🐷",
+      "🌟","🔥","⚡","💧","🍀","🌈","☀️","🌙","⭐","🎈","🎁","🎵"
+    ];
+
+    // DOM refs
+    const boardEl = document.getElementById('board');
+    const movesEl = document.getElementById('moves');
+    const timerEl = document.getElementById('timer');
+    const pairsEl = document.getElementById('pairs');
+    const restartBtn = document.getElementById('restart');
+    const hintBtn = document.getElementById('hint');
+    const bestEl = document.getElementById('best');
+
+    // Game state variables
+    let deck = []; // array of card objects {id, emoji}
+    let firstPick = null;
+    let secondPick = null;
+    let lockBoard = false;
+    let matchedPairs = 0;
+    let moves = 0;
+    let totalPairs = 0;
+    let timer = null;
+    let seconds = 0;
+    let started = false;
+
+    // Best score key
+    const STORAGE_KEY = 'memory_game_best';
+
+    function formatTime(sec){
+      const m = Math.floor(sec / 60).toString().padStart(2,'0');
+      const s = (sec % 60).toString().padStart(2,'0');
+      return `${m}:${s}`;
+    }
+
+    function updateHUD(){
+      movesEl.textContent = `Moves: ${moves}`;
+      timerEl.textContent = `Time: ${formatTime(seconds)}`;
+      pairsEl.textContent = `Matched: ${matchedPairs}/${totalPairs}`;
+    }
+
+    function startTimer(){
+      if(timer) return;
+      timer = setInterval(()=>{
+        seconds++;
+        timerEl.textContent = `Time: ${formatTime(seconds)}`;
+      },1000);
+    }
+    function stopTimer(){
+      clearInterval(timer);
+      timer = null;
+    }
+
+    function saveBest(){
+      const bestRaw = localStorage.getItem(STORAGE_KEY);
+      const current = { moves, seconds };
+      if(!bestRaw){
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+        return;
+      }
+      try{
+        const best = JSON.parse(bestRaw);
+        // Better if fewer moves; if tie, faster time wins
+        let isBetter = false;
+        if(current.moves < best.moves) isBetter = true;
+        else if(current.moves === best.moves && current.seconds < best.seconds) isBetter = true;
+        if(isBetter) localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+      }catch(e){}
+    }
+
+    function showBest(){
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw){ bestEl.textContent = '—'; return; }
+      try{
+        const b = JSON.parse(raw);
+        bestEl.textContent = `${b.moves} moves • ${formatTime(b.seconds)}`;
+      }catch(e){
+        bestEl.textContent = '—';
+      }
+    }
+
+    // Fisher-Yates shuffle
+    function shuffle(array){
+      for(let i = array.length -1; i>0; i--){
+        const j = Math.floor(Math.random()*(i+1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    function buildDeck(pairCount){
+      // choose first pairCount emojis from shuffled pool
+      const pool = shuffle([...EMOJIS]).slice(0, pairCount);
+      const cards = pool.flatMap((emoji, idx) => ([
+        { id: `${idx}-a`, emoji },
+        { id: `${idx}-b`, emoji }
+      ]));
+      return shuffle(cards);
+    }
+
+    function renderBoard(){
+      boardEl.innerHTML = '';
+      // set grid columns depending on total pairs to make nice layout
+      const totalCards = deck.length;
+      // generate card elements
+      deck.forEach(card => {
+        const cardEl = document.createElement('button');
+        cardEl.className = 'card';
+        cardEl.setAttribute('data-id', card.id);
+        cardEl.setAttribute('aria-label','memory card');
+        cardEl.setAttribute('aria-pressed','false');
+        cardEl.innerHTML = `
+          <div class="card-inner">
+            <div class="card-face face-front" aria-hidden="true">${card.emoji}</div>
+            <div class="card-face face-back" aria-hidden="true">
+              <div class="icon">❓</div>
+            </div>
+          </div>
+        `;
+        // click handler
+        cardEl.addEventListener('click', onCardClick);
+        boardEl.appendChild(cardEl);
+      });
+
+      // update board columns for a balanced layout: prefer even rows
+      // we keep CSS auto-fit; this ensures responsive behavior.
+    }
+
+    function onCardClick(e){
+      if(lockBoard) return;
+      const el = e.currentTarget;
+      if(el.classList.contains('matched')) return;
+      if(el === firstPick) return; // clicking same card
+
+      // start the timer on first action
+      if(!started){
+        started = true;
+        startTimer();
+      }
+
+      // flip visually
+      flipCard(el);
+
+      if(!firstPick){
+        firstPick = el;
+        el.setAttribute('aria-pressed','true');
+        return;
+      }
+
+      secondPick = el;
+      moves++;
+      updateHUD();
+
+      // disable further clicking until check completes
+      lockBoard = true;
+
+      const firstEmoji = getEmojiFromCard(firstPick);
+      const secondEmoji = getEmojiFromCard(secondPick);
+
+      if(firstEmoji === secondEmoji){
+        // matched
+        setTimeout(()=> {
+          markMatched(firstPick);
+          markMatched(secondPick);
+          resetPicks();
+          matchedPairs++;
+          updateHUD();
+          lockBoard = false;
+
+          if(matchedPairs === totalPairs){
+            // game complete
+            stopTimer();
+            saveBest();
+            showBest();
+            setTimeout(()=> {
+              alert(`🎉 You won! Moves: ${moves}, Time: ${formatTime(seconds)}`);
+            }, 250);
+          }
+        }, 180);
+      } else {
+        // not matched: flip back after delay
+        setTimeout(()=> {
+          unflipCard(firstPick);
+          unflipCard(secondPick);
+          resetPicks();
+          lockBoard = false;
+        }, FLIP_DELAY);
+      }
+    }
+
+    function flipCard(cardEl){
+      cardEl.classList.add('flipped');
+    }
+    function unflipCard(cardEl){
+      cardEl.classList.remove('flipped');
+      cardEl.setAttribute('aria-pressed','false');
+    }
+    function getEmojiFromCard(cardEl){
+      const idx = Array.from(boardEl.children).indexOf(cardEl);
+      // fallback: read innerText of front face
+      const front = cardEl.querySelector('.face-front');
+      return front ? front.textContent.trim() : null;
+    }
+    function markMatched(cardEl){
+      cardEl.classList.add('matched');
+      cardEl.setAttribute('aria-pressed','true');
+    }
+    function resetPicks(){
+      firstPick = null;
+      secondPick = null;
+    }
+
+    function newGame(){
+      // reset
+      stopTimer();
+      seconds = 0;
+      started = false;
+      moves = 0;
+      matchedPairs = 0;
+      lockBoard = false;
+      resetPicks();
+
+      // choose pair count based on available screen/PAIR_COUNT
+      totalPairs = Math.max(2, Math.min(PAIR_COUNT, Math.floor((EMOJIS.length))));
+      deck = buildDeck(totalPairs);
+      renderBoard();
+      updateHUD();
+      showBest();
+      // set pairs total
+      pairsEl.textContent = `Matched: ${matchedPairs}/${totalPairs}`;
+    }
+
+    // Hint: reveal all unmatched cards briefly
+    function showHint(){
+      if(lockBoard) return;
+      lockBoard = true;
+      const cards = Array.from(boardEl.children).filter(c => !c.classList.contains('matched'));
+      // flip all
+      cards.forEach(c => c.classList.add('flipped'));
+      setTimeout(()=>{
+        cards.forEach(c => c.classList.remove('flipped'));
+        lockBoard = false;
+      }, HINT_DURATION);
+    }
+
+    // wire up controls
+    restartBtn.addEventListener('click', newGame);
+    hintBtn.addEventListener('click', showHint);
+
+    // keyboard accessibility: Enter or Space flips a focused card
+    boardEl.addEventListener('keydown', (e)=>{
+      // let browser handle focus; when enter/space and target is .card, trigger click
+      if((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('card')){
+        e.preventDefault();
+        e.target.click();
+      }
+    });
+
+    // init
+    showBest();
+    newGame();
+
+    // small accessibility: focus first card on load
+    setTimeout(()=>{
+      const first = boardEl.querySelector('.card');
+      if(first) first.setAttribute('tabindex','0');
+    }, 250);
+
+  })();
+  </script>
+</body>
+</html>
